@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ckb-std = "0.17.0"
+# ckb-std = "0.17.0"
+ckb-std = { git = "https://github.com/xxuejie/ckb-std", rev = "19b4d84" }
 ckb-gen-types = { version = "0.200.0-rc1", default-features = false }
 
 [dependencies.ckb-fips205-utils]
