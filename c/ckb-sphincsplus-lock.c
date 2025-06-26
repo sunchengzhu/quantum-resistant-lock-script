@@ -277,6 +277,11 @@ int get_public_key_hash(uint8_t *pub_key) {
   script_seg.ptr = (uint8_t *)script;
   script_seg.size = script_len;
 
+  CHECK2(
+    (MolReader_Script_verify(&script_seg, false) == MOL_OK),
+    ERROR_SPHINCSPLUS_ARGS
+  );
+
   mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
   mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
   CHECK2((args_bytes_seg.size == BLAKE2B_BLOCK_SIZE), ERROR_SPHINCSPLUS_ARGS);
