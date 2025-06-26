@@ -71,16 +71,16 @@ void randombytes(unsigned char *x, unsigned long long xlen) { ASSERT(false); }
 
 static int extract_witness_lock(uint8_t *witness, uint64_t len,
                                 mol_seg_t *lock_bytes_seg) {
-  if (len < 20) {
+  mol_seg_t witness_args_seg;
+  witness_args_seg.ptr = witness;
+  witness_args_seg.size = len;
+
+  if (MolReader_WitnessArgs_verify(&witness_args_seg, false) != MOL_OK) {
     return ERROR_SPHINCSPLUS_ENCODING;
   }
-  uint32_t lock_length = *((uint32_t *)(&witness[16]));
-  if (len < 20 + lock_length) {
-    return ERROR_SPHINCSPLUS_ENCODING;
-  } else {
-    lock_bytes_seg->ptr = &witness[20];
-    lock_bytes_seg->size = lock_length;
-  }
+
+  mol_seg_t lock_seg = MolReader_WitnessArgs_get_lock(&witness_args_seg);
+  *lock_bytes_seg = MolReader_Bytes_raw_bytes(&lock_seg);
   return CKB_SUCCESS;
 }
 
