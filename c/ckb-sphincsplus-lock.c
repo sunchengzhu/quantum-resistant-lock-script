@@ -1,7 +1,12 @@
-
+#ifndef FUZZING
 #undef CKB_DECLARATION_ONLY
 #include "entry.h"
 #define CKB_DECLARATION_ONLY
+#else
+// Suppress debug messages
+#define mol2_printf(...)
+#include "fuzzing_syscalls.h"
+#endif
 
 #include <blake2b.h>
 #include <ckb_exec.h>
@@ -295,7 +300,7 @@ int check_pubkey(uint8_t *pubkey, uint8_t *pubkey_hash) {
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
   int err = CKB_SUCCESS;
 
   uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE];

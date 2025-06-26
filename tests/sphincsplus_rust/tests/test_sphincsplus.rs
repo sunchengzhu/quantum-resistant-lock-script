@@ -2,6 +2,7 @@ use ckb_script::TransactionScriptsVerifier;
 use ckb_types::packed::Byte32;
 use sphincsplus_rust_test::dummy_data_loader::DummyDataLoader;
 use sphincsplus_rust_test::utils::*;
+use sphincsplus_rust_test::save_tx;
 
 pub fn debug_printer(_script: &Byte32, msg: &str) {
     print!("{}", msg);
@@ -19,6 +20,7 @@ fn test_base() {
     let tx = sign_tx(&mut dummy, tx, &mut config);
 
     let resolved_tx = build_resolved_tx(&dummy, &tx);
+    save_tx(&resolved_tx, &dummy, "");
     let mut verifier = TransactionScriptsVerifier::new(&resolved_tx, &dummy);
 
     verifier.set_debug_printer(debug_printer);
@@ -37,6 +39,7 @@ fn test_err_sign() {
     let tx = sign_tx(&mut dummy, tx, &mut config);
 
     let resolved_tx = build_resolved_tx(&dummy, &tx);
+    save_tx(&resolved_tx, &dummy, "");
     let mut verifier = TransactionScriptsVerifier::new(&resolved_tx, &dummy);
 
     verifier.set_debug_printer(debug_printer);
@@ -57,6 +60,7 @@ fn test_err_pubkey_hash() {
     let tx = sign_tx(&mut dummy, tx, &mut config);
 
     let resolved_tx = build_resolved_tx(&dummy, &tx);
+    save_tx(&resolved_tx, &dummy, "");
     let mut verifier = TransactionScriptsVerifier::new(&resolved_tx, &dummy);
 
     verifier.set_debug_printer(debug_printer);
@@ -77,6 +81,7 @@ fn test_err_pubkey() {
     let tx = sign_tx(&mut dummy, tx, &mut config);
 
     let resolved_tx = build_resolved_tx(&dummy, &tx);
+    save_tx(&resolved_tx, &dummy, "");
     let mut verifier = TransactionScriptsVerifier::new(&resolved_tx, &dummy);
 
     verifier.set_debug_printer(debug_printer);
@@ -97,6 +102,7 @@ fn test_err_message() {
     let tx = sign_tx(&mut dummy, tx, &mut config);
 
     let resolved_tx = build_resolved_tx(&dummy, &tx);
+    save_tx(&resolved_tx, &dummy, "");
     let mut verifier = TransactionScriptsVerifier::new(&resolved_tx, &dummy);
 
     verifier.set_debug_printer(debug_printer);

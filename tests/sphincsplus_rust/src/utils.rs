@@ -122,14 +122,12 @@ pub fn gen_tx_with_grouped_args(
 
     // setup default tx builder
     let dummy_capacity = Capacity::shannons(42);
-    let mut tx_builder = TransactionBuilder::default()
-        .cell_dep(
-            CellDep::new_builder()
-                .out_point(sighash_all_out_point)
-                .dep_type(DepType::Code.into())
-                .build(),
-        )
-        .output_data(Bytes::new().pack());
+    let mut tx_builder = TransactionBuilder::default().cell_dep(
+        CellDep::new_builder()
+            .out_point(sighash_all_out_point)
+            .dep_type(DepType::Code.into())
+            .build(),
+    );
     // validate_signature_rsa will be referenced by preimage in witness
 
     for (args, inputs_size) in grouped_args {

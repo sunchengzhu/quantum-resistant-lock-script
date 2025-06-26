@@ -1,0 +1,5 @@
+/corpus/
+libfuzzer-protobuf
+hfuzz-protobuf
+*.log
+crash-*

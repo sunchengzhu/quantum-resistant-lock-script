@@ -37,6 +37,9 @@ rand = "0.8.5"
 clap = { version = "4.3.2", optional = true }
 base64 = { version = "0.22.0", optional = true }
 
+ckb-mock-tx-types = "0.202.0"
+ckb-types-200 = { package = "ckb-types", version = "0.202.0" }
+serde_json = "1.0.140"
 
 [[bin]]
 name = "generate_fix_infos"

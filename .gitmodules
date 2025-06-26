@@ -4,3 +4,6 @@
 [submodule "deps/sphincsplus"]
 	path = deps/sphincsplus
 	url = https://github.com/sphincs/sphincsplus.git
+[submodule "fuzzing/ckb-script-fuzzing-toolkit"]
+	path = fuzzing/ckb-script-fuzzing-toolkit
+	url = https://github.com/xxuejie/ckb-script-fuzzing-toolkit
