@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::{Loader, utils::*};
 use ckb_fips205_utils::{Hasher, construct_flag, signing::TxSigner};
 use ckb_testtool::{
@@ -18,7 +19,12 @@ const C_NAME: &str = "c-sphincs-all-in-one-lock";
 const HYBRID_NAME: &str = "hybrid-sphincs-all-in-one-lock";
 const RUST_NAME: &str = "sphincs-all-in-one-lock";
 
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
 proptest! {
+    // #![proptest_config(ProptestConfig {
+    //     cases: 36, .. ProptestConfig::default()
+    // })]
     #[test]
     fn test_single_signer_c(
         signer in signer_strategy(),
@@ -35,6 +41,15 @@ proptest! {
             &[0],
             rng,
         ).expect("pass verification");
+        let idx = COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
+        println!(
+            "[{idx}] signer = {:?}, param_id = {:?} ({}), seed = {}, consume cycles: {}",
+            signers[0],
+            signers[0].param_id(),
+            signers[0].param_id() as u8,
+            seed,
+            cycles
+        );
         println!("consume cycles: {cycles}");
     }
 
