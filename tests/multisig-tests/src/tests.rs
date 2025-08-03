@@ -69,6 +69,14 @@ proptest! {
         );
         println!("Selected signer indices: {selected:?}");
 
+        for &idx in &selected {
+            println!(
+                "Selected signer {}: param_id = {:?} ({})",
+                idx,
+                signers[idx].param_id(),
+                signers[idx].param_id() as u8
+            );
+        }
         let cycles = _run_valid_tx(
             C_NAME,
             &signers,
