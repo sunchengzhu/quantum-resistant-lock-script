@@ -243,6 +243,35 @@ proptest! {
         ).expect("pass verification");
         println!("consume cycles: {cycles}");
     }
+
+    #[test]
+    fn test_multi_valid_signer_order_irrelevant_c(
+        signers in vec(signer_strategy(), 2..7),
+        seed: u64,
+    ) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let threshold = rng.gen_range(2..=signers.len());
+        println!("Pubkeys: {}, threshold: {}", signers.len(), threshold);
+        let mut selected = gen_selected(
+            &mut rng,
+            signers.len(),
+            threshold,
+            0,
+        );
+        println!("Selected signer indices: {selected:?}");
+        selected.reverse();
+        println!("Reversed selected signer indices: {selected:?}");
+
+        let cycles = _run_valid_tx(
+            C_NAME,
+            &signers,
+            threshold,
+            0,
+            &selected,
+            rng,
+        ).expect("pass verification");
+        println!("consume cycles: {cycles}");
+    }
 }
 
 proptest! {
@@ -424,6 +453,72 @@ proptest! {
             rng,
         ).unwrap_err();
         assert!(!format!("{e}").contains("ExceededMaximumCycles"));
+    }
+
+    #[test]
+    fn test_multi_first_n_gt_threshold_c(
+        signers in vec(signer_strategy(), 2..7),
+        seed: u64,
+    ) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        // threshold < signers.len()
+        let threshold = rng.gen_range(1..=signers.len());
+        let first_n = threshold + 1;
+        println!("Pubkeys: {}, threshold: {}, require_first_n: {}",
+            signers.len(), threshold, first_n);
+        let selected = gen_selected(
+            &mut rng,
+            signers.len(),
+            threshold - 1,
+            0,
+        );
+        println!("Selected signer indices: {selected:?}");
+
+        let e = _run_valid_tx(
+            C_NAME,
+            &signers,
+            threshold,
+            first_n,
+            &selected,
+            rng,
+        ).unwrap_err();
+        assert!(!format!("{e}").contains("ExceededMaximumCycles"));
+        // println!("{e}");
+    }
+
+    #[test]
+    fn test_multi_invalid_param_flag_lowbit_c(
+        signers in vec(signer_strategy(), 1..7),
+        seed: u64,
+    ) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let threshold = rng.gen_range(1..=signers.len());
+        let first_n = rng.gen_range(1..=threshold);
+        println!("Pubkeys: {}, threshold: {}, require_first_n: {}",
+            signers.len(), threshold, first_n);
+
+        let conf = build_multisig_configuration(&signers, threshold, first_n);
+        let param_flag_offset = 4;
+        // Bytes -> Vec<u8>
+        let mut conf_vec = conf.to_vec();
+        conf_vec[param_flag_offset] |= 1;
+        // println!("after patch, lock bytes: {:?}", &conf_vec[..10]);
+        let conf = Bytes::from(conf_vec);
+
+        let (context, unsigned_tx, inputs, first_script_group_index) =
+            _build_unsigned_tx(C_NAME, conf, &mut rng);
+        let signed_tx = _sign_multisig_tx(
+            &unsigned_tx,
+            &inputs,
+            first_script_group_index,
+            &signers,
+            &(0..threshold).collect::<Vec<_>>(),
+            &mut rng,
+        );
+
+        let e = context.verify_tx(&signed_tx, 1_000_000_000).unwrap_err();
+        assert!(!format!("{e}").contains("ExceededMaximumCycles"));
+        // println!("{e}");
     }
 }
 
