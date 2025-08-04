@@ -1,7 +1,7 @@
 use ckb_fips205_utils::{
     ParamId, construct_flag,
     message::{HashAlgorithm, build_fips205_final_message},
-    signing::{Sha2128F, Sha2128S, Sha2192F, Sha2256F, Shake128F, TxSigner},
+    signing::{Sha2128F, Sha2128S, Sha2192F, Sha2256F, Shake128F, TxSigner, Sha2192S, Sha2256S, Shake128S, Shake192F, Shake192S, Shake256F, Shake256S},
 };
 use ckb_sphincs_utils::{SphincsPlus, sphincsplus::sphincs_plus_get_seed_size};
 use ckb_testtool::bytes::Bytes;
@@ -20,6 +20,13 @@ pub enum Signer {
     Rust256F(Sha2256F),
     Rust128S(Sha2128S),
     RustShake128F(Shake128F),
+    Rust192S(Sha2192S),
+    Rust256S(Sha2256S),
+    RustShake128S(Shake128S),
+    RustShake192F(Shake192F),
+    RustShake192S(Shake192S),
+    RustShake256F(Shake256F),
+    RustShake256S(Shake256S),
 }
 
 impl TxSigner for Signer {
@@ -27,10 +34,17 @@ impl TxSigner for Signer {
         match self {
             Signer::C(_) => ckb_sphincs_utils::sphincsplus::param_id().unwrap(),
             Signer::Rust128F(s) => s.param_id(),
-            Signer::Rust192F(s) => s.param_id(),
-            Signer::Rust256F(s) => s.param_id(),
             Signer::Rust128S(s) => s.param_id(),
+            Signer::Rust192F(s) => s.param_id(),
+            Signer::Rust192S(s) => s.param_id(),
+            Signer::Rust256F(s) => s.param_id(),
+            Signer::Rust256S(s) => s.param_id(),
             Signer::RustShake128F(s) => s.param_id(),
+            Signer::RustShake128S(s) => s.param_id(),
+            Signer::RustShake192F(s) => s.param_id(),
+            Signer::RustShake192S(s) => s.param_id(),
+            Signer::RustShake256F(s) => s.param_id(),
+            Signer::RustShake256S(s) => s.param_id(),
         }
     }
 
@@ -38,10 +52,17 @@ impl TxSigner for Signer {
         match self {
             Signer::C(s) => Bytes::from(s.pk.clone()),
             Signer::Rust128F(s) => s.public_key_bytes(),
-            Signer::Rust192F(s) => s.public_key_bytes(),
-            Signer::Rust256F(s) => s.public_key_bytes(),
             Signer::Rust128S(s) => s.public_key_bytes(),
+            Signer::Rust192F(s) => s.public_key_bytes(),
+            Signer::Rust192S(s) => s.public_key_bytes(),
+            Signer::Rust256F(s) => s.public_key_bytes(),
+            Signer::Rust256S(s) => s.public_key_bytes(),
             Signer::RustShake128F(s) => s.public_key_bytes(),
+            Signer::RustShake128S(s) => s.public_key_bytes(),
+            Signer::RustShake192F(s) => s.public_key_bytes(),
+            Signer::RustShake192S(s) => s.public_key_bytes(),
+            Signer::RustShake256F(s) => s.public_key_bytes(),
+            Signer::RustShake256S(s) => s.public_key_bytes(),
         }
     }
 
@@ -53,10 +74,17 @@ impl TxSigner for Signer {
                 Some(&[]),
             ))),
             Signer::Rust128F(s) => s.sign_message(rng, message),
-            Signer::Rust192F(s) => s.sign_message(rng, message),
-            Signer::Rust256F(s) => s.sign_message(rng, message),
             Signer::Rust128S(s) => s.sign_message(rng, message),
+            Signer::Rust192F(s) => s.sign_message(rng, message),
+            Signer::Rust192S(s) => s.sign_message(rng, message),
+            Signer::Rust256F(s) => s.sign_message(rng, message),
+            Signer::Rust256S(s) => s.sign_message(rng, message),
             Signer::RustShake128F(s) => s.sign_message(rng, message),
+            Signer::RustShake128S(s) => s.sign_message(rng, message),
+            Signer::RustShake192F(s) => s.sign_message(rng, message),
+            Signer::RustShake192S(s) => s.sign_message(rng, message),
+            Signer::RustShake256F(s) => s.sign_message(rng, message),
+            Signer::RustShake256S(s) => s.sign_message(rng, message),
         }
     }
 }
@@ -66,10 +94,17 @@ impl fmt::Debug for Signer {
         match self {
             Signer::C(_) => write!(f, "sphincsplus-sha2-128f"),
             Signer::Rust128F(_) => write!(f, "fips205-sha2-128f"),
-            Signer::Rust192F(_) => write!(f, "fips205-sha2-192f"),
-            Signer::Rust256F(_) => write!(f, "fips205-sha2-256f"),
             Signer::Rust128S(_) => write!(f, "fips205-sha2-128s"),
+            Signer::Rust192F(_) => write!(f, "fips205-sha2-192f"),
+            Signer::Rust192S(_) => write!(f, "fips205-sha2-192s"),
+            Signer::Rust256F(_) => write!(f, "fips205-sha2-256f"),
+            Signer::Rust256S(_) => write!(f, "fips205-sha2-256s"),
             Signer::RustShake128F(_) => write!(f, "fips205-shake-128f"),
+            Signer::RustShake128S(_) => write!(f, "fips205-shake-128s"),
+            Signer::RustShake192F(_) => write!(f, "fips205-shake-192f"),
+            Signer::RustShake192S(_) => write!(f, "fips205-shake-192s"),
+            Signer::RustShake256F(_) => write!(f, "fips205-shake-256f"),
+            Signer::RustShake256S(_) => write!(f, "fips205-shake-256s"),
         }
     }
 }
@@ -102,7 +137,7 @@ pub fn build_multisig_configuration(
     Bytes::from(res)
 }
 
-pub fn signer_strategy() -> impl Strategy<Value = Signer> {
+pub fn signer_strategy() -> impl Strategy<Value=Signer> {
     prop_oneof![
         any::<u64>().prop_map(|seed| {
             let mut rng = StdRng::seed_from_u64(seed);
@@ -129,6 +164,34 @@ pub fn signer_strategy() -> impl Strategy<Value = Signer> {
         any::<u64>().prop_map(|seed| {
             let mut rng = StdRng::seed_from_u64(seed);
             Signer::RustShake128F(Shake128F::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::Rust192S(Sha2192S::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::Rust256S(Sha2256S::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::RustShake128S(Shake128S::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::RustShake192F(Shake192F::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::RustShake192S(Shake192S::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::RustShake256F(Shake256F::new(&mut rng))
+        }),
+        any::<u64>().prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            Signer::RustShake256S(Shake256S::new(&mut rng))
         }),
     ]
 }
