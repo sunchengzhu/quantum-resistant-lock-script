@@ -1,10 +1,12 @@
+use ckb_fips205_utils::signing::{Sha2128F, TxSigner};
 use ckb_gen_types::packed::{BytesOpt, WitnessArgs};
 use ckb_gen_types::prelude::{Builder, Entity, Pack};
-use ckb_fips205_utils::signing::{Sha2128F, TxSigner};
+use rand::{SeedableRng, rngs::StdRng};
 use tx_structure_tests::ContractUtil;
+use tx_structure_tests::cells::sphincsplus_data::{
+    SPHINCSPLUS_PK_SIZE, SphincsplusData, SphincsplusDataCell,
+};
 use tx_structure_tests::prelude::ContextExt;
-use tx_structure_tests::cells::sphincsplus_data::{SphincsplusData, SphincsplusDataCell, SPHINCSPLUS_PK_SIZE};
-use rand::{rngs::StdRng, SeedableRng};
 
 #[test]
 fn test_sphincsplus_transfer_successful() {
@@ -18,7 +20,11 @@ fn test_sphincsplus_transfer_successful() {
     pubkey_arr.copy_from_slice(&pubkey_bytes);
     let pubkey_vec = signer.public_key_bytes();
     assert_eq!(pubkey_vec.len(), 32); // 防御性检查
-    let pubkey_arr: [u8; 32] = signer.public_key_bytes().as_ref().try_into().expect("pk length should be 32");
+    let pubkey_arr: [u8; 32] = signer
+        .public_key_bytes()
+        .as_ref()
+        .try_into()
+        .expect("pk length should be 32");
     let cell_data = SphincsplusData { pubkey: pubkey_arr };
     let input_cell = SphincsplusDataCell::new([0u8; 32], cell_data);
 
@@ -42,7 +48,7 @@ fn test_sphincsplus_transfer_successful() {
     // 签名
     let signature = signer.sign_message(&mut rng, message);
     lock_bytes.extend_from_slice(&signature);
-    
+
     // 4. 构造 WitnessArgs（lock=组装好的 lock 字节，input_type/output_type 为空）
     let witness_args = WitnessArgs::new_builder()
         .lock(BytesOpt::new_builder().set(Some(lock_bytes.pack())).build())
@@ -56,8 +62,8 @@ fn test_sphincsplus_transfer_successful() {
     let mut tx = ckb_testtool::ckb_types::core::TransactionBuilder::default().build();
 
     // 添加 input/output
-    tx = ct.add_input(tx, ct.alway_contract.clone(), Some(type_contract.clone()), &input_cell, 100);
-    tx = ct.add_outpoint(tx, ct.alway_contract.clone(), Some(type_contract.clone()), &input_cell, 100);
+    tx = ct.add_input(tx, type_contract.clone(), None, &input_cell, 100);
+    tx = ct.add_outpoint(tx, type_contract.clone(), None, &input_cell, 100);
 
     // 6. 设置 witness
     tx = tx

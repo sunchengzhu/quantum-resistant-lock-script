@@ -14,6 +14,7 @@ members = [
   "tests/precise-fuzzing/fuzz",
   "tests/sphincsplus_rust",
   "tests/validation-tests",
+  "tests/tx-structure-tests",
   "tools/ckb-sphincs-tools",
   "tools/ckb-sphincs-utils",
 ]

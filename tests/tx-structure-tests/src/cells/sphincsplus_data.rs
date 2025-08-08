@@ -8,7 +8,7 @@ pub const SPHINCSPLUS_SIGN_SIZE: usize = 29792;
 
 #[derive(PartialEq, Debug)]
 pub struct SphincsplusDataCell {
-    pub lock_arg: u8,
+    pub lock_arg: [u8; 32],
     pub type_arg: Option<[u8; 32]>,
     pub data: SphincsplusData,
     pub witness: Option<SphincsplusWitness>,
@@ -34,7 +34,7 @@ pub struct SphincsplusWitness {
 impl SphincsplusDataCell {
     pub(crate) fn default() -> Self {
         SphincsplusDataCell {
-            lock_arg: 0,
+            lock_arg: [0u8; 32],
             type_arg: None,
             data: SphincsplusData {
                 pubkey: [0u8; SPHINCSPLUS_PK_SIZE],
@@ -51,7 +51,7 @@ impl SphincsplusDataCell {
 
     pub fn new(type_arg: [u8; 32], data: SphincsplusData) -> Self {
         SphincsplusDataCell {
-            lock_arg: 0,
+            lock_arg: [0u8; 32],
             type_arg: Some(type_arg),
             data,
             witness: None,
