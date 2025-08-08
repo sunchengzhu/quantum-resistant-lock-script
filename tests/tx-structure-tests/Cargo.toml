@@ -1,0 +1,16 @@
+[package]
+name = "tx-structure-tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.136", features = ["derive"] }
+ckb-testtool = "0.15.0"
+serde_json = "1.0.140"
+ckb-std = "0.17.0"
+serde_with = { version = "3.14.0", features = ["macros"] }
+serde_molecule = { git = "https://github.com/XuJiandong/serde_molecule.git", rev = "07f145d", version = "1.0.0" }
+ckb-gen-types = "=0.200.0"
+ckb-types = "=0.200.0"
+ckb-fips205-utils = { path = "../../crates/ckb-fips205-utils", features = ["signing"] }
+rand = "0.8.5"
