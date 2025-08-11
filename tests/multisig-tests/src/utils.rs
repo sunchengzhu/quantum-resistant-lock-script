@@ -9,6 +9,7 @@ use proptest::prelude::*;
 use rand::{SeedableRng, rngs::StdRng};
 use rand_core::CryptoRngCore;
 use std::fmt;
+use rand::Rng;
 
 // We have extensive tests covering the signature verification process
 // for all different kinds of parameter sets. Here we only select a handful

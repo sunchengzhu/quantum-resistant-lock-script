@@ -1,78 +1,237 @@
-use ckb_fips205_utils::signing::{Sha2128F, TxSigner};
-use ckb_gen_types::packed::{BytesOpt, WitnessArgs};
+use ckb_fips205_utils::signing::TxSigner;
+use ckb_gen_types::bytes::Bytes;
+use ckb_gen_types::packed::{CellInput, CellOutput, WitnessArgs};
 use ckb_gen_types::prelude::{Builder, Entity, Pack};
-use rand::{SeedableRng, rngs::StdRng};
-use tx_structure_tests::ContractUtil;
-use tx_structure_tests::cells::sphincsplus_data::{
-    SPHINCSPLUS_PK_SIZE, SphincsplusData, SphincsplusDataCell,
-};
+use ckb_testtool::context::Context;
+use ckb_types::core::{Capacity, TransactionBuilder, TransactionView};
+use ckb_types::prelude::IntoTransactionView;
+use multisig_tests::utils::signer_strategy;
+use proptest::prelude::ProptestConfig;
+use proptest::proptest;
+use rand::{CryptoRng, RngCore, SeedableRng, rngs::StdRng};
+use tx_structure_tests::Loader;
+use tx_structure_tests::cells::sphincsplus_data::SphincsplusData;
 use tx_structure_tests::prelude::ContextExt;
 
-#[test]
-fn test_sphincsplus_transfer_successful() {
-    // 1. 初始化随机数与 signer
-    let mut rng = StdRng::seed_from_u64(42);
-    let signer = Sha2128F::new(&mut rng);
+proptest! {
+    #![proptest_config(ProptestConfig {
+        cases: 10, .. ProptestConfig::default()
+    })]
 
-    // 2. 构造 cell data
-    let pubkey_bytes = signer.public_key_bytes();
-    let mut pubkey_arr = vec![0u8; pubkey_bytes.len()];
-    pubkey_arr.copy_from_slice(&pubkey_bytes);
-    let pubkey_vec = signer.public_key_bytes();
-    assert_eq!(pubkey_vec.len(), 32); // 防御性检查
-    let pubkey_arr: [u8; 32] = signer
-        .public_key_bytes()
-        .as_ref()
-        .try_into()
-        .expect("pk length should be 32");
-    let cell_data = SphincsplusData { pubkey: pubkey_arr };
-    let input_cell = SphincsplusDataCell::new([0u8; 32], cell_data);
+    #[test]
+    fn test_sphincsplus_one_input(
+        signer in signer_strategy(),
+        seed: u64,
+    ) {
 
-    // 3. 组装 lock 字节（严格遵守多签合约格式）
-    let mut lock_bytes = Vec::new();
-    lock_bytes.push(0x00); // reserved
-    lock_bytes.push(0x01); // require_first_n
-    lock_bytes.push(0x01); // threshold
-    lock_bytes.push(0x01); // pubkeys
+        let mut rng = StdRng::seed_from_u64(seed);
+        let pubkey_bytes = signer.public_key_bytes();
 
-    // flag: 0x80 | param_id(=0)（假如是 Sha2128F），具体按你的合约参数
-    let flag = 0x80; // 最高位表示有签名，param_id=0（单签合约一般是0）
-    lock_bytes.push(flag);
 
-    // pubkey
-    lock_bytes.extend_from_slice(&pubkey_bytes[..SPHINCSPLUS_PK_SIZE]);
+        // 用 Vec<u8> 存储公钥，动态长度
+        let cell_data_struct = SphincsplusData {
+            pubkey: pubkey_bytes.to_vec(),
+        };
+        // 你的 cell data
+        let cell_data_bytes = cell_data_struct.as_bytes();
+        // 初始化上下文 & 合约
+        let mut context = Context::default();
+        let contract_bin: Bytes = Loader::default().load_binary("c-sphincs-all-in-one-lock");
+        let out_point = context.deploy_cell(contract_bin);
 
-    // message 按合约计算，通常是 blake2b 哈希/原文
-    let message = b"ckb test message";
+        let lock_script = context
+            .build_script(&out_point, signer.script_args())
+            .expect("script");
 
-    // 签名
-    let signature = signer.sign_message(&mut rng, message);
-    lock_bytes.extend_from_slice(&signature);
+        // 构造 input / output cell
+        let capacity = Capacity::shannons(100).pack();
+        let input_cell_output = CellOutput::new_builder()
+            .capacity(capacity.clone())
+            .lock(lock_script.clone())
+            .build();
 
-    // 4. 构造 WitnessArgs（lock=组装好的 lock 字节，input_type/output_type 为空）
-    let witness_args = WitnessArgs::new_builder()
-        .lock(BytesOpt::new_builder().set(Some(lock_bytes.pack())).build())
+        let output_cell_output = CellOutput::new_builder()
+            .capacity(capacity.clone())
+            .lock(lock_script.clone())
+            .build();
+
+        // 构造未签名交易
+        let tx = build_custom_tx(
+            &mut context,
+            (
+                input_cell_output.clone(),
+                Bytes::from(cell_data_bytes.clone()),
+            ),
+            (
+                output_cell_output.clone(),
+                Bytes::from(cell_data_bytes.clone()),
+            ),
+        );
+
+        // 签名
+        let signed_tx = sign_custom_tx(
+            &signer,
+            &mut rng,
+            &mut context,
+            &tx,
+            (input_cell_output, Bytes::from(cell_data_bytes)),
+        );
+
+        // 验证
+        let ret = context.should_be_passed(&signed_tx, 1_000_000_000);
+        println!("ret: {:?}", ret);
+    }
+
+    #[test]
+    fn test_sphincsplus_two_inputs(
+        signer in signer_strategy(),
+        seed: u64,
+    ) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let pubkey_bytes = signer.public_key_bytes();
+
+        // 用 Vec<u8> 存储公钥，动态长度
+        let cell_data_struct = SphincsplusData {
+            pubkey: pubkey_bytes.to_vec(),
+        };
+        let cell_data_bytes = cell_data_struct.as_bytes();
+
+        // 初始化上下文 & 合约
+        let mut context = Context::default();
+        let contract_bin: Bytes = Loader::default().load_binary("c-sphincs-all-in-one-lock");
+        let out_point = context.deploy_cell(contract_bin);
+
+        let lock_script = context
+            .build_script(&out_point, signer.script_args())
+            .expect("script");
+
+        // 构造两个输入 cell
+        let capacity = Capacity::shannons(100).pack();
+        let input_cell_output1 = CellOutput::new_builder()
+            .capacity(capacity.clone())
+            .lock(lock_script.clone())
+            .build();
+
+        let input_cell_output2 = CellOutput::new_builder()
+            .capacity(capacity.clone())
+            .lock(lock_script.clone())
+            .build();
+
+        // 构造一个输出 cell
+        let output_cell_output = CellOutput::new_builder()
+            .capacity(capacity.clone())
+            .lock(lock_script.clone())
+            .build();
+
+        // 调用 build_custom_tx_multi_inputs，传入两个输入（切片）和一个输出
+        let tx = build_custom_tx_multi_inputs(
+            &mut context,
+            &[
+                (input_cell_output1.clone(), Bytes::from(cell_data_bytes.clone())),
+                (input_cell_output2.clone(), Bytes::from(cell_data_bytes.clone())),
+            ],
+            (output_cell_output.clone(), Bytes::from(cell_data_bytes.clone())),
+        );
+
+        let signed_tx = sign_custom_tx_multi_inputs(
+            &signer,
+            &mut rng,
+            &mut context,
+            &tx,
+            &[
+                (input_cell_output1, Bytes::from(cell_data_bytes.clone())),
+                (input_cell_output2, Bytes::from(cell_data_bytes)),
+            ],
+        );
+
+        // 验证
+        let ret = context.should_be_passed(&signed_tx, 1_000_000_000);
+        println!("ret: {:?}", ret);
+    }
+}
+
+/// 构造一个未签名交易，允许传入自定义的 input/output cell
+fn build_custom_tx(
+    context: &mut Context,
+    input_cell: (CellOutput, Bytes),
+    output_cell: (CellOutput, Bytes),
+) -> TransactionView {
+    let input = CellInput::new_builder()
+        .previous_output(context.create_cell(input_cell.0.clone(), input_cell.1.clone()))
         .build();
 
-    // 5. ContractUtil 流程组装 tx
-    let mut ct = ContractUtil::new();
-    let type_contract = ct.deploy_contract("c-sphincs-all-in-one-lock");
+    TransactionBuilder::default()
+        .input(input)
+        .output(output_cell.0.clone())
+        .output_data(output_cell.1.clone().pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .input_type(Some(Bytes::from(vec![0u8; 200])).pack())
+                .output_type(Some(Bytes::from(vec![0u8; 200])).pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
+        .build()
+}
 
-    // 新建空 tx
-    let mut tx = ckb_testtool::ckb_types::core::TransactionBuilder::default().build();
+fn sign_custom_tx<S, R>(
+    signer: &S,
+    rng: &mut R,
+    context: &mut Context,
+    tx: &TransactionView,
+    input_cell: (CellOutput, Bytes),
+) -> TransactionView
+where
+    S: TxSigner,
+    R: CryptoRng + RngCore,
+{
+    let unsigned_tx = context.complete_tx(tx.clone());
+    let signed_tx = signer.sign_tx(rng, &unsigned_tx.data(), &[input_cell], 0);
+    signed_tx.into_view()
+}
 
-    // 添加 input/output
-    tx = ct.add_input(tx, type_contract.clone(), None, &input_cell, 100);
-    tx = ct.add_outpoint(tx, type_contract.clone(), None, &input_cell, 100);
+fn build_custom_tx_multi_inputs(
+    context: &mut Context,
+    input_cells: &[(CellOutput, Bytes)],
+    output_cell: (CellOutput, Bytes),
+) -> TransactionView {
+    let inputs: Vec<CellInput> = input_cells
+        .iter()
+        .map(|(output, data)| {
+            CellInput::new_builder()
+                .previous_output(context.create_cell(output.clone(), data.clone()))
+                .build()
+        })
+        .collect();
 
-    // 6. 设置 witness
-    tx = tx
-        .as_advanced_builder()
-        .set_witnesses(vec![witness_args.as_bytes().pack()])
-        .build();
+    TransactionBuilder::default()
+        .set_inputs(inputs)
+        .output(output_cell.0.clone())
+        .output_data(output_cell.1.clone().pack())
+        .witness(
+            WitnessArgs::new_builder()
+                .input_type(Some(Bytes::from(vec![0u8; 200])).pack())
+                .output_type(Some(Bytes::from(vec![0u8; 200])).pack())
+                .build()
+                .as_bytes()
+                .pack(),
+        )
+        .build()
+}
 
-    // 7. 完成 tx 并校验
-    tx = ct.context.complete_tx(tx);
-    let ret = ct.context.should_be_passed(&tx, 10_000_000);
-    println!("ret: {:?}", ret);
+fn sign_custom_tx_multi_inputs<S, R>(
+    signer: &S,
+    rng: &mut R,
+    context: &mut Context,
+    tx: &TransactionView,
+    input_cells: &[(CellOutput, Bytes)],
+) -> TransactionView
+where
+    S: TxSigner,
+    R: CryptoRng + RngCore,
+{
+    let unsigned_tx = context.complete_tx(tx.clone());
+    let signed_tx = signer.sign_tx(rng, &unsigned_tx.data(), input_cells, 0);
+    signed_tx.into_view()
 }
