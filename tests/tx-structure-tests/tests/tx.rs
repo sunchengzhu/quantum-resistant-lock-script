@@ -1,7 +1,7 @@
 use ckb_fips205_utils::signing::TxSigner;
 use ckb_gen_types::bytes::Bytes;
 use ckb_gen_types::packed::{CellDep, CellInput, CellOutput, OutPoint, WitnessArgs};
-use ckb_gen_types::prelude::{Builder, Entity, Pack};
+use ckb_gen_types::prelude::{Builder, Entity, Pack, Unpack};
 use ckb_testtool::context::Context;
 use ckb_types::core::{Capacity, TransactionBuilder, TransactionView};
 use ckb_types::prelude::IntoTransactionView;
@@ -78,6 +78,77 @@ proptest! {
         );
 
         // 验证
+        let ret = context.should_be_passed(&signed_tx, 1_000_000_000);
+        println!("ret: {:?}", ret);
+    }
+
+    #[test]
+    fn test_spawn_exec_with_sphincs(
+        signer in signer_strategy(),
+        seed: u64,
+    ) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let pubkey_bytes = signer.public_key_bytes();
+
+        // 构造 data 部分
+        let cell_data_struct = SphincsplusData {
+            pubkey: pubkey_bytes.to_vec(),
+        };
+        let cell_data_bytes = cell_data_struct.as_bytes();
+
+        // 加载合约并部署
+        let mut context = Context::default();
+
+        let spawn_bin: Bytes = Loader::default().load_binary("spawn_exec");
+        let spawn_out_point = context.deploy_cell(spawn_bin);
+
+        let sphincs_bin: Bytes = Loader::default().load_binary("sphincs-all-in-one-lock");
+        let sphincs_out_point = context.deploy_cell(sphincs_bin);
+
+        // 构造 lock 使用 spawn + script_args
+        let lock_script = context
+            .build_script(&spawn_out_point, signer.script_args())
+            .expect("spawn-exec lock script");
+
+        let capacity = Capacity::shannons(100).pack();
+        let input_output = CellOutput::new_builder()
+            .capacity(capacity.clone())
+            .lock(lock_script.clone())
+            .build();
+
+        // 构造 unsigned tx（包含 cell_dep）
+        let input = CellInput::new_builder()
+            .previous_output(context.create_cell(input_output.clone(), cell_data_bytes.clone().into()))
+            .build();
+
+        // 构造 spawn 的参数：将目标 ELF 的 OutPoint 写入 witness.lock
+        let mut witness_lock_payload = vec![];
+        witness_lock_payload.extend_from_slice(sphincs_out_point.tx_hash().as_slice());
+        let index: u32 = sphincs_out_point.index().unpack();
+        witness_lock_payload.extend_from_slice(&index.to_le_bytes());
+
+        let witness = WitnessArgs::new_builder()
+            .lock(Some(Bytes::from(witness_lock_payload)).pack())
+            .build();
+
+        // 构造 tx：包含两个 cell_dep（spawn 本身、c-sphincs）
+        let tx = TransactionBuilder::default()
+            .input(input)
+            .output(input_output.clone())
+            .output_data(cell_data_bytes.clone().pack())
+            .cell_dep(CellDep::new_builder().out_point(spawn_out_point.clone()).build())
+            .cell_dep(CellDep::new_builder().out_point(sphincs_out_point.clone()).build())
+            .witness(witness.as_bytes().pack())
+            .build();
+
+        let signed_tx = sign_custom_tx(
+            &signer,
+            &mut rng,
+            &mut context,
+            &tx,
+            (input_output.clone(), cell_data_bytes.into()),
+        );
+
         let ret = context.should_be_passed(&signed_tx, 1_000_000_000);
         println!("ret: {:?}", ret);
     }
